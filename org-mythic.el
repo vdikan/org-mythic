@@ -1,8 +1,6 @@
 ;; Chaos rank is 0 to 8, not 1 to 9, for consistency.
 
-;; TODO - internal todos
 ;; TODO - questions
-;; TODO - random events
 
 (require 'org)
 
@@ -188,6 +186,13 @@
   (org-mythic-random-element org-mythic-event-subjects))
 
 
+(defun org-mythic-construct-event ()
+  "Construct an org property-drawer content of a random event."
+  `((:key "FOCUS" :value ,(org-mythic-get-focus))
+    (:key "ACTION" :value ,(org-mythic-get-action))
+    (:key "SUBJECT" :value ,(org-mythic-get-subject))))
+
+
 (defun org-mythic-begins-list (tag)
   "Returns list of entryies' begin-points for a tag apart of `org_mythic'"
   (org-element-map (org-element-parse-buffer 'headline) 'headline
@@ -207,28 +212,37 @@ If not found, jump to the end."
     (t (org-mythic-boundary num (cdr nlist)))))
 
 
-;;TODO change here for first scene to appear
 (defun org-mythic-find-previous-scene ()
-  "Parse element tree to get previous Mythic scene."
+  "Parse element tree to get previous Mythic scene.
+You need to have root headline of a scenario."
   (let ((begins-list (org-mythic-begins-list "scene"))
         (this-begin (org-element-property :begin
                                           (org-element-at-point))))
     (let ((prev-scene-begin (org-mythic-boundary
                              this-begin begins-list)))
-      (if prev-scene-begin
+      (if (numberp prev-scene-begin)
           (progn (goto-char prev-scene-begin)
-                 (org-element-at-point))))))
+                 (org-element-at-point))
+        (progn                          ; workaround for a first scene
+          (message "First scene: Place in the root Headline of a Scenario")
+          (org-element-at-point))))))
 
 
-(defun org-mythic-insert-next (endpoint title level tags property placeholder)
+(defun org-mythic-insert-next (endpoint title level tags property-list placeholder)
   (progn
     (goto-char endpoint)
     (newline)
     (insert (org-element-interpret-data
              `(headline (:title ,title :level ,level :tags ,tags)
-                        (property-drawer nil ((node-property ,property)))
+                        (property-drawer nil
+                                         ,(mapcar #'(lambda (x) `(node-property ,x))
+                                                  property-list))
                         (,placeholder))))))
 
+
+(defun org-mythic-insert-random-event (endpoint level)
+  (org-mythic-insert-next endpoint "_Random Event_" level '("org_mythic" "event")
+                          (org-mythic-construct-event) "~~ event desccription ~~"))
 
 
 (defun org-mythic-add-scene (title)
@@ -252,7 +266,7 @@ If not found, jump to the end."
            (message (format "Chaos at bay (rolled %d)" chaos-roll))
            (org-mythic-insert-next endpoint title level
                                    '("org_mythic" "scene")
-                                   `(:key "CHAOS" :value ,chaos-factor)
+                                   `((:key "CHAOS" :value ,chaos-factor))
                                    "~~ scene description ~~")))
 
         ((and (<= chaos-roll chaos-factor)
@@ -264,11 +278,17 @@ If not found, jump to the end."
                             title chaos-roll))
            (org-mythic-insert-next endpoint altered-title level
                                    '("org_mythic" "scene")
-                                   `(:key "CHAOS" :value ,chaos-factor)
+                                   `((:key "CHAOS" :value ,chaos-factor))
                                    "~~ scene description ~~")))
-        ;; TODO add final cond
-        )
-)))
+
+        (t
+         (progn
+           (message (format "Chaos Widens! Scene interrupted! (rolled %d)" chaos-roll))
+           (org-mythic-insert-random-event endpoint (1+ level))
+           (org-mythic-insert-next endpoint (format "%s *(interrupted)*" title)
+                                   level '("org_mythic" "scene")
+                                   `((:key "CHAOS" :value ,chaos-factor))
+                                   "~~ scene description ~~")))))))
 
 
 (defvar org-mythic-mode-map (make-sparse-keymap)
