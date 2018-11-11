@@ -1,5 +1,9 @@
 ;; Chaos rank is 0 to 8, not 1 to 9, for consistency.
 
+;; TODO - internal todos
+;; TODO - questions
+;; TODO - random events
+
 (require 'org)
 
 
@@ -203,6 +207,7 @@ If not found, jump to the end."
     (t (org-mythic-boundary num (cdr nlist)))))
 
 
+;;TODO change here for first scene to appear
 (defun org-mythic-find-previous-scene ()
   "Parse element tree to get previous Mythic scene."
   (let ((begins-list (org-mythic-begins-list "scene"))
@@ -261,6 +266,7 @@ If not found, jump to the end."
                                    '("org_mythic" "scene")
                                    `(:key "CHAOS" :value ,chaos-factor)
                                    "~~ scene description ~~")))
+        ;; TODO add final cond
         )
 )))
 
@@ -272,7 +278,7 @@ If not found, jump to the end."
 (define-minor-mode org-mythic-mode
   "Minor simple Mythic RPG scenarios mode for Org."
   :lighter " Mythic" :keymap org-mythic-mode-map
-  (define-key org-mythic-mode-map "a" #'org-mythic-add-scene)
+  ;; (define-key org-mythic-mode-map "a" #'org-mythic-add-scene)
   ;; (add-hook 'org-mythic-mode-hook 'org-mode)
   )
 
