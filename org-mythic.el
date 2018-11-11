@@ -1,8 +1,7 @@
 ;; Chaos rank is 0 to 8, not 1 to 9, for consistency.
 
-;; TODO - questions
-
 (require 'org)
+(require 'ido)
 
 
 (defconst org-mythic-fate-chart
@@ -23,14 +22,14 @@
 (defconst org-mythic-odds
   '(("I" . "Impossible")
     ("N" . "No way")
-    ("U" . "Very unlikely")
+    ("U_" . "Very unlikely")
     ("u" . "Unlikely")
     ("d" . "50/50 (default)")
-    ("D" . "Somewhat likely")
+    ("D_" . "Somewhat likely")
     ("l" . "Likely")
-    ("L" . "Very Likely")
+    ("L_" . "Very Likely")
     ("s" . "Near sure thing")
-    ("S" . "A sure thing")
+    ("S_" . "A sure thing")
     ("H" . "Has to be"))
   "Odds chart for core Mythic rules.")
 
@@ -73,10 +72,6 @@
   "Find target value on the fate chart with respect to ODDS and CHAOS levels."
   (nth (- 8 chaos-rank)  ; fate chart is reversed with respect to chaos
        (nth odds-rank org-mythic-fate-chart)))
-
-
-;; (org-mythic-odds-rank
-;;  (org-mythic-get-odd  "d"))
 
 
 (defconst org-mythic-events
@@ -266,7 +261,8 @@ You need to have root headline of a scenario."
            (message (format "Chaos at bay (rolled %d)" chaos-roll))
            (org-mythic-insert-next endpoint title level
                                    '("org_mythic" "scene")
-                                   `((:key "CHAOS" :value ,chaos-factor))
+                                   `((:key "CHAOS" :value ,chaos-factor)
+                                     (:key "CHAOS_ROLL" :value ,chaos-roll))
                                    "~~ scene description ~~")))
 
         ((and (<= chaos-roll chaos-factor)
@@ -278,7 +274,8 @@ You need to have root headline of a scenario."
                             title chaos-roll))
            (org-mythic-insert-next endpoint altered-title level
                                    '("org_mythic" "scene")
-                                   `((:key "CHAOS" :value ,chaos-factor))
+                                   `((:key "CHAOS" :value ,chaos-factor)
+                                     (:key "CHAOS_ROLL" :value ,chaos-roll))
                                    "~~ scene description ~~")))
 
         (t
@@ -287,8 +284,47 @@ You need to have root headline of a scenario."
            (org-mythic-insert-random-event endpoint (1+ level))
            (org-mythic-insert-next endpoint (format "%s *(interrupted)*" title)
                                    level '("org_mythic" "scene")
-                                   `((:key "CHAOS" :value ,chaos-factor))
+                                   `((:key "CHAOS" :value ,chaos-factor)
+                                     (:key "CHAOS_ROLL" :value ,chaos-roll))
                                    "~~ scene description ~~")))))))
+
+
+(defun org-mythic-pick-odds ()
+  "Prompt user to pick question odds from a list."
+  (interactive)
+  (let ((choices (mapcar 'car org-mythic-odds)))
+    (ido-completing-read "Pick odds for a question: "
+                         choices t t nil nil)))
+
+
+(defun org-mythic-eventp (roll chaos-rank)
+  (if (= (% roll 11) 0)
+      (if (<= (/ roll 11) chaos-rank) t)))
+
+
+(defun org-mythic-answer-question ()
+  (interactive)
+  (let ((question (org-element-at-point))
+        (startpoint (org-element-property :begin (org-element-at-point)))
+        (endpoint (org-element-property :end (org-element-at-point)))
+        (level (org-current-level))
+        (scene (org-mythic-find-previous-scene)))
+    (let ((chaos-rank (string-to-int (org-element-property :CHAOS scene)))
+          (odds-rank  (org-mythic-odds-rank
+                       (org-mythic-get-odds (org-mythic-pick-odds)))))
+      (let ((roll (org-mythic-d100))
+            (target (org-mythic-find-target odds-rank chaos-rank)))
+        (goto-char startpoint)                 ; return back to the question
+        (org-set-tags-to "org_mythic:question")
+        (org-entry-put startpoint "ROLL" (number-to-string roll))
+        (org-entry-put startpoint "TARGET" (number-to-string target))
+        (org-entry-put startpoint "ANSWER" (org-mythic-answer-roll roll target))
+        (goto-char endpoint)
+        (if (org-mythic-eventp roll chaos-rank)
+            (progn
+              (message (format "Chaos Invades! New Random Event! (rolled %d)" roll))
+              (org-mythic-insert-random-event endpoint (1+ level))
+              (goto-char endpoint)))))))
 
 
 (defvar org-mythic-mode-map (make-sparse-keymap)
