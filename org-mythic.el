@@ -303,6 +303,7 @@ You need to have root headline of a scenario."
 
 
 (defun org-mythic-answer-question ()
+  "Turn current headline into a Mythic question."
   (interactive)
   (let ((question (org-element-at-point))
         (startpoint (org-element-property :begin (org-element-at-point)))
