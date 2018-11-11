@@ -1,5 +1,7 @@
 ;; Chaos rank is 0 to 8, not 1 to 9, for consistency.
 
+(require 'org)
+
 
 (defconst org-mythic-fate-chart
   '(( 50   25  15  10  5    5   0   0 -20 )
@@ -180,3 +182,99 @@
 (defun org-mythic-get-subject ()
   "Shortcut for random subject."
   (org-mythic-random-element org-mythic-event-subjects))
+
+
+(defun org-mythic-begins-list (tag)
+  "Returns list of entryies' begin-points for a tag apart of `org_mythic'"
+  (org-element-map (org-element-parse-buffer 'headline) 'headline
+    (lambda (hl)
+      (and (member "org_mythic" (org-element-property :tags hl))
+           (member tag (org-element-property :tags hl))
+           (org-element-property :begin hl)))))
+
+
+(defun org-mythic-boundary (num nlist)
+  "Get the left boundary of an interval containing num from nlist.
+If not found, jump to the end."
+  (cond
+    ((null (cdr nlist)) (car nlist))
+    ((and (<= (car nlist) num)
+          (> (cadr nlist) num)) (car nlist))
+    (t (org-mythic-boundary num (cdr nlist)))))
+
+
+(defun org-mythic-find-previous-scene ()
+  "Parse element tree to get previous Mythic scene."
+  (let ((begins-list (org-mythic-begins-list "scene"))
+        (this-begin (org-element-property :begin
+                                          (org-element-at-point))))
+    (let ((prev-scene-begin (org-mythic-boundary
+                             this-begin begins-list)))
+      (if prev-scene-begin
+          (progn (goto-char prev-scene-begin)
+                 (org-element-at-point))))))
+
+
+(defun org-mythic-insert-next (endpoint title level tags property placeholder)
+  (progn
+    (goto-char endpoint)
+    (newline)
+    (insert (org-element-interpret-data
+             `(headline (:title ,title :level ,level :tags ,tags)
+                        (property-drawer nil ((node-property ,property)))
+                        (,placeholder))))))
+
+
+
+(defun org-mythic-add-scene (title)
+  "Add new scene to the current scenario."
+  (interactive "*sScene Setup: ")
+  (let ((endpoint (org-element-property
+                   :end (org-element-at-point)))  ; Remember endpoint we'll start at
+        (prev-scene (org-mythic-find-previous-scene)))  ; Find previous scene (moves point)
+    (let ((chaos-factor (if (org-element-property :CHAOS prev-scene)                     ;^
+                            (string-to-int (org-element-property                         ;|
+                                            :CHAOS prev-scene))                          ;|
+                          4))  ; Default chaos factor level                              ;|
+          (chaos-roll (random 9))                                                        ;|
+          (level (or (org-current-level) 1)))  ; On the level with previous scene -------;|
+
+      (cond
+
+        ((> chaos-roll
+            chaos-factor)
+         (progn
+           (message (format "Chaos at bay (rolled %d)" chaos-roll))
+           (org-mythic-insert-next endpoint title level
+                                   '("org_mythic" "scene")
+                                   `(:key "CHAOS" :value ,chaos-factor)
+                                   "~~ scene description ~~")))
+
+        ((and (<= chaos-roll chaos-factor)
+              (= (% chaos-roll 2) 1))
+         (let ((altered-title (read-string
+                               (format "Scene Alters! Develop your idea: %s - "
+                                       title))))
+           (message (format "Chaos alteres scene %s (rolled %d)"
+                            title chaos-roll))
+           (org-mythic-insert-next endpoint altered-title level
+                                   '("org_mythic" "scene")
+                                   `(:key "CHAOS" :value ,chaos-factor)
+                                   "~~ scene description ~~")))
+        )
+)))
+
+
+(defvar org-mythic-mode-map (make-sparse-keymap)
+  "Keymap for `org-mythic-mode', a minor mode for Org.")
+
+
+(define-minor-mode org-mythic-mode
+  "Minor simple Mythic RPG scenarios mode for Org."
+  :lighter " Mythic" :keymap org-mythic-mode-map
+  (define-key org-mythic-mode-map "a" #'org-mythic-add-scene)
+  ;; (add-hook 'org-mythic-mode-hook 'org-mode)
+  )
+
+
+(provide 'org-mythic)
