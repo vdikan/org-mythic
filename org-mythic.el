@@ -1,8 +1,15 @@
+;;; org-mythic.el --- Mythic GM emulator minor for Org-mode
+
+
+;;; Commentary:
 ;; Chaos rank is 0 to 8, not 1 to 9, for consistency.
+;;
 
 (require 'org)
 (require 'ido)
 
+
+;;; Code:
 
 (defconst org-mythic-fate-chart
   '(( 50   25  15  10  5    5   0   0 -20 )
@@ -43,7 +50,7 @@
 
 
 (defun org-mythic-get-odds (code)
-  "Retrn odds cons cell that corresponds to the literal code."
+  "Retrn odds cons cell that corresponds to the literal CODE."
   (org-mythic-select code org-mythic-odds))
 
 
@@ -69,7 +76,7 @@
 
 
 (defun org-mythic-find-target (odds-rank chaos-rank)
-  "Find target value on the fate chart with respect to ODDS and CHAOS levels."
+  "Find target value on the fate chart with respect to ODDS-RANK and CHAOS-RANK levels."
   (nth (- 8 chaos-rank)  ; fate chart is reversed with respect to chaos
        (nth odds-rank org-mythic-fate-chart)))
 
@@ -189,7 +196,7 @@
 
 
 (defun org-mythic-begins-list (tag)
-  "Returns list of entryies' begin-points for a tag apart of `org_mythic'"
+  "Return list of entryies' begin-points for a TAG apart of `org_mythic'."
   (org-element-map (org-element-parse-buffer 'headline) 'headline
     (lambda (hl)
       (and (member "org_mythic" (org-element-property :tags hl))
@@ -198,7 +205,7 @@
 
 
 (defun org-mythic-boundary (num nlist)
-  "Get the left boundary of an interval containing num from nlist.
+  "Get the left boundary of an interval containing NUM from NLIST.
 If not found, jump to the end."
   (cond
     ((null (cdr nlist)) (car nlist))
@@ -341,3 +348,5 @@ You need to have root headline of a scenario."
 
 
 (provide 'org-mythic)
+
+;;; org-mythic.el ends here
